@@ -6,6 +6,7 @@ import {
 
 import { AppModule } from '@/infra/app.module';
 import { setupGracefulShutdown } from '@/infra/graceful-shutdown';
+import { LoggerService } from '@/sharedModules/logger/services/logger.service';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -13,6 +14,8 @@ async function bootstrap(): Promise<void> {
     new FastifyAdapter(),
     { bufferLogs: true },
   );
+
+  app.useLogger(app.get(LoggerService));
 
   app.enableShutdownHooks();
 

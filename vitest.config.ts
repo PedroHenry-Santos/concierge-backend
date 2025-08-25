@@ -8,7 +8,9 @@ export default defineConfig({
     include: ['**/*.spec.ts'],
     globals: true,
     alias: {
-      '@': './src',
+      '@/sharedModules': path.resolve(__dirname, './src/module/shared/module'),
+      '@/sharedLibs': path.resolve(__dirname, './src/module/shared'),
+      '@/infra': path.resolve(__dirname, './src/infra'),
     },
     root: './',
   },
@@ -19,7 +21,9 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@/sharedModules': path.resolve(__dirname, './src/module/shared/module'),
+      '@/sharedLibs': path.resolve(__dirname, './src/module/shared'),
+      '@/infra': path.resolve(__dirname, './src/infra'),
     },
   },
 });
