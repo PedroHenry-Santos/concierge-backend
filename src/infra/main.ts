@@ -6,6 +6,7 @@ import {
 
 import { AppModule } from '@/infra/app.module';
 import { setupGracefulShutdown } from '@/infra/graceful-shutdown';
+import { ConfigurationService } from '@/sharedModules/configuration/services';
 import { LoggerService } from '@/sharedModules/logger/services/logger.service';
 
 async function bootstrap(): Promise<void> {
@@ -15,13 +16,15 @@ async function bootstrap(): Promise<void> {
     { bufferLogs: true },
   );
 
-  app.useLogger(app.get(LoggerService));
+  const logger = app.get(LoggerService);
+  const configuration = app.get(ConfigurationService);
 
+  app.useLogger(logger);
   app.enableShutdownHooks();
 
-  const port = process.env.PORT ?? 3000;
+  const port = configuration.get('port');
   await app.listen(port, () => {
-    console.log(`Server is listening on port ${port}`);
+    console.log(`Server is listening on port ${String(port)}`);
   });
 
   setupGracefulShutdown(app);
