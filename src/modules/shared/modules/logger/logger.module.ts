@@ -1,12 +1,13 @@
-import path from 'node:path';
+import {resolve} from 'node:path';
 
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { LoggerModule as PinoLoggerModule } from 'nestjs-pino';
 
+import { ConfigurationService } from '@/sharedModules/configuration/services/configuration.service';
 import { LoggerService } from '@/sharedModules/logger/services/logger.service';
 import { customRequestId } from '@/sharedModules/logger/utils/custom-request-id';
-import { ConfigurationService } from '@/sharedModules/configuration/services/configuration.service';
 
+@Global()
 @Module({
   imports: [
     PinoLoggerModule.forRootAsync({
@@ -16,9 +17,12 @@ import { ConfigurationService } from '@/sharedModules/configuration/services/con
           autoLogging: configuration.get('env') === 'production',
           level: configuration.get('env') === 'development' ? 'trace' : 'info',
           genReqId: customRequestId,
-          transport: configuration.get('env') === 'development' ? {
-            target: path.resolve(__dirname, 'utils/custom-pino-pretty'),
-          } : undefined,
+          transport:
+            configuration.get('env') === 'development'
+              ? {
+                  target: resolve(__dirname, 'utils/custom-pino-pretty'),
+                }
+              : undefined,
         },
       }),
     }),

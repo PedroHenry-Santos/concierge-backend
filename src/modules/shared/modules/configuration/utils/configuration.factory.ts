@@ -1,6 +1,9 @@
 import { z } from 'zod';
 
-import { type Config, configurationSchema } from '@/sharedModules/configuration/schemas';
+import {
+  type Config,
+  configurationSchema,
+} from '@/sharedModules/configuration/schemas';
 
 export const factory = (): Config => {
   const validated = configurationSchema.safeParse({

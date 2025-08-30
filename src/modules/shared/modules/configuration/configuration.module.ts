@@ -11,6 +11,7 @@ export const ConfigurationModule = {
   forRoot(options?: NestConfigModuleOptions): DynamicModule {
     return {
       module: ConfigurationService,
+      global: true,
       imports: [
         NestConfigModule.forRoot({
           ...options,
