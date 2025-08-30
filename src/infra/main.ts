@@ -5,14 +5,14 @@ import {
 } from '@nestjs/platform-fastify';
 
 import { AppModule } from '@/infra/app.module';
-import { setupGracefulShutdown } from '@/infra/graceful-shutdown';
+import { registerGracefulShutdown } from '@/infra/utils';
 import { ConfigurationService } from '@/sharedModules/configuration/services';
 import { LoggerService } from '@/sharedModules/logger/services/logger.service';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter(),
+    new FastifyAdapter({ logger: false }),
     { bufferLogs: true },
   );
 
@@ -22,12 +22,16 @@ async function bootstrap(): Promise<void> {
   app.useLogger(logger);
   app.enableShutdownHooks();
 
-  const port = configuration.get('port');
-  await app.listen(port, () => {
-    console.log(`Server is listening on port ${String(port)}`);
+  registerGracefulShutdown(app, {
+    timeoutMs: 15_000,
+    cleanupTasks: [],
   });
 
-  setupGracefulShutdown(app);
+  const port = configuration.get('port');
+  await app.listen(port, () => {
+    logger.log(`Server is listening on Port: ${String(port)}`, 'Bootstrap');
+    logger.log(`Process ID: ${process.pid}`, 'Bootstrap');
+  });
 }
 
 try {
