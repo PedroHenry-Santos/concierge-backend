@@ -109,7 +109,7 @@ export function initOpenTelemetry(options?: OpenTelemetryOptions): void {
     [ATTR_SERVICE_NAME]: options?.serviceName ?? process.env.OTEL_SERVICE_NAME,
     [ATTR_SERVICE_VERSION]:
       options?.serviceVersion ?? process.env.npm_package_version,
-    [ATTR_SERVICE_NAMESPACE]: 'concierge',
+    [ATTR_SERVICE_NAMESPACE]: process.env.npm_package_name ?? 'concierge',
     [ATTR_DEPLOYMENT_ENVIRONMENT]: process.env.NODE_ENV ?? 'development',
   });
 
