@@ -162,7 +162,7 @@ export class AttributeValidator {
         return sanitizationRule(value);
       } catch (error) {
         AttributeValidator.logger.warn(
-          `Failed to apply sanitization rule for "${key}": ${error.message}`,
+          `Failed to apply sanitization rule for "${key}": ${(error as Error).message}`,
         );
         return value;
       }
