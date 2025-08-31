@@ -12,7 +12,7 @@ import { registerGracefulShutdown } from '@/infra/utils';
 import { ConfigurationService } from '@/sharedModules/configuration/services';
 import { LoggerService } from '@/sharedModules/logger/services/logger.service';
 
-import { getSdk } from './tracing';
+import { getSdk, isTelemetryEnabled } from './tracing';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -31,6 +31,14 @@ async function bootstrap(): Promise<void> {
     timeoutMs: 15_000,
     cleanupTasks: [
       async () => {
+        if (!isTelemetryEnabled()) {
+          logger.log(
+            'OpenTelemetry shutdown skipped: telemetry disabled',
+            'Shutdown',
+          );
+          return;
+        }
+
         const sdk = getSdk();
         if (sdk) {
           try {

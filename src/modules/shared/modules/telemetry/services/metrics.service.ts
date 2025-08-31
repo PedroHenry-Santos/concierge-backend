@@ -3,6 +3,7 @@ import { Meter } from '@opentelemetry/api';
 
 import { TELEMETRY_CONSTANTS } from '../constants/telemetry.constants';
 import { Attributes } from '../types/telemetry.types';
+import { AttributeValidator } from '../utils/attribute-validator.utility';
 import { TelemetryService } from './telemetry.service';
 
 /**
@@ -30,6 +31,7 @@ interface GaugeOptions extends MetricOptions {
 export class MetricsService {
   private readonly logger = new Logger(MetricsService.name);
   private readonly meter: Meter;
+  private readonly attributeValidator = new AttributeValidator();
 
   constructor(private readonly telemetryService: TelemetryService) {
     this.meter = this.telemetryService.getMeter();
@@ -62,6 +64,8 @@ export class MetricsService {
     options?: MetricOptions,
   ): void {
     this.validateMetricName(name);
+    const validatedAttributes =
+      this.attributeValidator.validateAndSanitize(attributes);
 
     let counter = this.counters.get(name);
 
@@ -74,7 +78,7 @@ export class MetricsService {
       this.logger.debug(`Created new counter metric: ${name}`);
     }
 
-    counter.add(value, attributes);
+    counter.add(value, validatedAttributes);
   }
 
   /**
@@ -87,6 +91,8 @@ export class MetricsService {
     options?: MetricOptions,
   ): void {
     this.validateMetricName(name);
+    const validatedAttributes =
+      this.attributeValidator.validateAndSanitize(attributes);
 
     let histogram = this.histograms.get(name);
 
@@ -99,7 +105,7 @@ export class MetricsService {
       this.logger.debug(`Created new histogram metric: ${name}`);
     }
 
-    histogram.record(value, attributes);
+    histogram.record(value, validatedAttributes);
   }
 
   /**
@@ -112,6 +118,8 @@ export class MetricsService {
     options?: MetricOptions,
   ): void {
     this.validateMetricName(name);
+    const validatedAttributes =
+      this.attributeValidator.validateAndSanitize(attributes);
 
     let upDownCounter = this.upDownCounters.get(name);
 
@@ -124,7 +132,7 @@ export class MetricsService {
       this.logger.debug(`Created new upDownCounter metric: ${name}`);
     }
 
-    upDownCounter.add(value, attributes);
+    upDownCounter.add(value, validatedAttributes);
   }
 
   /**
@@ -142,6 +150,10 @@ export class MetricsService {
       return;
     }
 
+    const validatedAttributes = this.attributeValidator.validateAndSanitize(
+      options?.attributes,
+    );
+
     const gauge = this.meter.createObservableGauge(name, {
       description: options?.description ?? `Gauge metric: ${name}`,
       unit: options?.unit,
@@ -150,7 +162,7 @@ export class MetricsService {
     gauge.addCallback(async (observableResult) => {
       try {
         const value = await callback();
-        observableResult.observe(value, options?.attributes);
+        observableResult.observe(value, validatedAttributes);
       } catch (error) {
         this.logger.error(`Error in gauge callback for ${name}:`, error);
       }
@@ -336,5 +348,27 @@ export class MetricsService {
     this.upDownCounters.clear();
     this.gauges.clear();
     this.logger.debug('All cached metrics cleared');
+  }
+
+  /**
+   * Get attribute validation guidelines (for debugging and documentation)
+   */
+  getAttributeGuidelines(): {
+    allowedKeys: string[];
+    sanitizationRules: Record<string, string>;
+    limits: {
+      maxAttributes: number;
+      maxValueLength: number;
+    };
+  } {
+    return {
+      allowedKeys: this.attributeValidator.getAllowedKeys(),
+      sanitizationRules: this.attributeValidator.getSanitizationRules(),
+      limits: {
+        maxAttributes: TELEMETRY_CONSTANTS.ATTRIBUTE_GUIDELINES.MAX_ATTRIBUTES,
+        maxValueLength:
+          TELEMETRY_CONSTANTS.ATTRIBUTE_GUIDELINES.MAX_VALUE_LENGTH,
+      },
+    };
   }
 }

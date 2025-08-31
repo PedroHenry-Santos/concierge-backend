@@ -68,6 +68,12 @@ function createSampler(): Sampler {
 }
 
 export function initOpenTelemetry(options?: OpenTelemetryOptions): void {
+  const otlpEnabled = process.env.OTLP_ENABLED !== 'false';
+  if (!otlpEnabled) {
+    console.log('OpenTelemetry initialization skipped: OTLP_ENABLED=false');
+    return;
+  }
+
   if (process.env.NODE_ENV === 'development') {
     diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
   }
@@ -100,11 +106,10 @@ export function initOpenTelemetry(options?: OpenTelemetryOptions): void {
         exportTimeoutMillis: isProduction ? 5000 : 2000,
         scheduledDelayMillis: isProduction ? 2000 : 1000,
       }),
+      ...(process.env.NODE_ENV === 'development'
+        ? [new BatchSpanProcessor(debugExporter)]
+        : []),
     ],
-    traceExporter:
-      process.env.NODE_ENV === 'development'
-        ? debugExporter
-        : otlpTraceExporter,
     metricReader: metricReader,
     contextManager: new AsyncLocalStorageContextManager(),
     textMapPropagator: new CompositePropagator({
@@ -163,4 +168,8 @@ export function initOpenTelemetry(options?: OpenTelemetryOptions): void {
 
 export function getSdk(): NodeSDK | undefined {
   return sdk;
+}
+
+export function isTelemetryEnabled(): boolean {
+  return process.env.OTLP_ENABLED !== 'false';
 }

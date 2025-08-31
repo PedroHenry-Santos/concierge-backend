@@ -88,4 +88,51 @@ export const TELEMETRY_CONSTANTS = {
     WHATSAPP_MESSAGE_SEND: 'whatsapp_message_send',
     WHATSAPP_MESSAGE_RECEIVE: 'whatsapp_message_receive',
   } as const,
+
+  /**
+   * Attribute guidelines to prevent high cardinality metrics
+   *
+   * HIGH CARDINALITY ATTRIBUTES TO AVOID:
+   * - Individual IDs (user_id, order_id, message_id, session_id, conversation_id)
+   * - Exact timestamps or sequential numbers
+   * - Full URLs with dynamic parameters
+   * - Exact IP addresses or phone numbers
+   * - Full stack traces or error messages
+   * - Unique tokens or API keys
+   *
+   * RECOMMENDED LOW CARDINALITY ALTERNATIVES:
+   * - Use categories instead of individual IDs (user_tier instead of user_id)
+   * - Use status/type classifications (order_status instead of order_id)
+   * - Use normalized paths (/{id} instead of /123)
+   * - Use ranges or buckets for numeric values
+   * - Use truncated or hashed versions for long strings
+   *
+   * LIMITS:
+   * - Maximum 10 attributes per metric
+   * - Maximum 100 characters per attribute value
+   * - Only predefined attribute keys are allowed (see AttributeValidator)
+   *
+   * EXAMPLES OF PROPER USAGE:
+   * ✅ Good: { user_tier: 'premium', order_status: 'completed', message_type: 'text' }
+   * ❌ Bad: { user_id: '12345', order_id: 'ORD-789', message_id: 'MSG-456-ABC' }
+   */
+  ATTRIBUTE_GUIDELINES: {
+    MAX_ATTRIBUTES: 10,
+    MAX_VALUE_LENGTH: 100,
+    RECOMMENDED_PATTERNS: [
+      'Use categories instead of individual IDs',
+      'Normalize URLs to remove dynamic segments',
+      'Convert long values to truncated summaries',
+      'Use status/type classifications',
+      'Apply bucketing for numeric ranges',
+    ],
+    FORBIDDEN_PATTERNS: [
+      'Individual user/order/message IDs',
+      'Full URLs with query parameters',
+      'Exact timestamps',
+      'Full stack traces',
+      'API keys or tokens',
+      'IP addresses or phone numbers',
+    ],
+  } as const,
 } as const;
