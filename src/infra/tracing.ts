@@ -148,6 +148,8 @@ export function initOpenTelemetry(options?: OpenTelemetryOptions): void {
             if (spanContext) {
               record['trace_id'] = spanContext.traceId;
               record['span_id'] = spanContext.spanId;
+              record['trace_flags'] = `0${spanContext.traceFlags.toString(16)}`;
+              record['trace_sampled'] = Boolean(spanContext.traceFlags & 0x01);
             }
           },
         },
