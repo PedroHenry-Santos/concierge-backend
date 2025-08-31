@@ -1,4 +1,4 @@
-import {resolve} from 'node:path';
+import path from 'node:path';
 
 import { Global, Module } from '@nestjs/common';
 import { LoggerModule as PinoLoggerModule } from 'nestjs-pino';
@@ -20,7 +20,7 @@ import { customRequestId } from '@/sharedModules/logger/utils/custom-request-id'
           transport:
             configuration.get('env') === 'development'
               ? {
-                  target: resolve(__dirname, 'utils/custom-pino-pretty'),
+                  target: path.resolve(__dirname, 'utils/custom-pino-pretty'),
                 }
               : undefined,
         },
