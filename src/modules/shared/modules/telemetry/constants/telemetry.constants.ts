@@ -31,15 +31,48 @@ export const TELEMETRY_CONSTANTS = {
    * Metric names following OpenTelemetry semantic conventions
    */
   METRICS: {
+    // HTTP metrics
     HTTP_REQUESTS_TOTAL: 'http_requests_total',
     HTTP_REQUEST_DURATION: 'http_request_duration',
+    HTTP_REQUEST_SIZE: 'http_request_size',
+    HTTP_RESPONSE_SIZE: 'http_response_size',
+
+    // Database metrics
     DATABASE_OPERATIONS_TOTAL: 'db_operations_total',
     DATABASE_OPERATION_DURATION: 'db_operation_duration',
+    DATABASE_CONNECTIONS_ACTIVE: 'db_connections_active',
+    DATABASE_CONNECTIONS_POOL_SIZE: 'db_connections_pool_size',
+
+    // Queue/Messaging metrics
     QUEUE_OPERATIONS_TOTAL: 'messaging_operations_total',
     QUEUE_OPERATION_DURATION: 'messaging_operation_duration',
     QUEUE_OPERATION_ERRORS: 'queue_operations_errors_total',
+    QUEUE_MESSAGE_SIZE: 'messaging_message_size',
+    QUEUE_PROCESSING_TIME: 'messaging_processing_time',
+
+    // WhatsApp specific metrics
     WHATSAPP_OPERATIONS_TOTAL: 'whatsapp_operations_total',
     WHATSAPP_OPERATION_ERRORS: 'whatsapp_operation_errors_total',
+    WHATSAPP_MESSAGE_SIZE: 'whatsapp_message_size',
+    WHATSAPP_WEBHOOK_DURATION: 'whatsapp_webhook_duration',
+
+    // Application metrics
+    APP_STARTUP_DURATION: 'app_startup_duration',
+    APP_MEMORY_USAGE: 'app_memory_usage',
+    APP_CPU_USAGE: 'app_cpu_usage',
+    APP_ACTIVE_CONNECTIONS: 'app_active_connections',
+
+    // Error metrics
+    ERRORS_TOTAL: 'errors_total',
+    EXCEPTIONS_TOTAL: 'exceptions_total',
+
+    // Performance metrics
+    EXECUTION_TIME: 'execution_time',
+    OPERATION_COUNT: 'operation_count',
+
+    // Business metrics (pre-approved names to avoid high cardinality)
+    BUSINESS_EVENT_COUNT: 'business_event_count',
+    USER_ACTION_COUNT: 'user_action_count',
   } as const,
 
   /**

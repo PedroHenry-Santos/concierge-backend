@@ -5,6 +5,27 @@ import { TELEMETRY_CONSTANTS } from '../constants/telemetry.constants';
 import { Attributes } from '../types/telemetry.types';
 import { TelemetryService } from './telemetry.service';
 
+/**
+ * Valid metric names from constants - prevents high cardinality metrics
+ */
+type ValidMetricName =
+  (typeof TELEMETRY_CONSTANTS.METRICS)[keyof typeof TELEMETRY_CONSTANTS.METRICS];
+
+/**
+ * Options for metric creation
+ */
+interface MetricOptions {
+  description?: string;
+  unit?: string;
+}
+
+/**
+ * Gauge callback options
+ */
+interface GaugeOptions extends MetricOptions {
+  attributes?: Attributes;
+}
+
 @Injectable()
 export class MetricsService {
   private readonly logger = new Logger(MetricsService.name);
@@ -32,14 +53,16 @@ export class MetricsService {
   >();
 
   /**
-   * Increment a counter metric
+   * Increment a counter metric - only accepts predefined metric names
    */
   incrementCounter(
-    name: string,
+    name: ValidMetricName,
     value = 1,
     attributes?: Attributes,
-    options?: { description?: string; unit?: string },
+    options?: MetricOptions,
   ): void {
+    this.validateMetricName(name);
+
     let counter = this.counters.get(name);
 
     if (!counter) {
@@ -55,14 +78,16 @@ export class MetricsService {
   }
 
   /**
-   * Record a histogram value
+   * Record a histogram value - only accepts predefined metric names
    */
   recordHistogram(
-    name: string,
+    name: ValidMetricName,
     value: number,
     attributes?: Attributes,
-    options?: { description?: string; unit?: string },
+    options?: MetricOptions,
   ): void {
+    this.validateMetricName(name);
+
     let histogram = this.histograms.get(name);
 
     if (!histogram) {
@@ -78,14 +103,16 @@ export class MetricsService {
   }
 
   /**
-   * Update an up-down counter
+   * Update an up-down counter - only accepts predefined metric names
    */
   updateUpDownCounter(
-    name: string,
+    name: ValidMetricName,
     value: number,
     attributes?: Attributes,
-    options?: { description?: string; unit?: string },
+    options?: MetricOptions,
   ): void {
+    this.validateMetricName(name);
+
     let upDownCounter = this.upDownCounters.get(name);
 
     if (!upDownCounter) {
@@ -101,13 +128,15 @@ export class MetricsService {
   }
 
   /**
-   * Create an observable gauge metric
+   * Create an observable gauge metric - only accepts predefined metric names
    */
   createGauge(
-    name: string,
+    name: ValidMetricName,
     callback: () => number | Promise<number>,
-    options?: { description?: string; unit?: string; attributes?: Attributes },
+    options?: GaugeOptions,
   ): void {
+    this.validateMetricName(name);
+
     if (this.gauges.has(name)) {
       this.logger.warn(`Gauge metric ${name} already exists`);
       return;
@@ -132,12 +161,11 @@ export class MetricsService {
   }
 
   /**
-   * Record execution time for a function
+   * Record execution time for a function using predefined execution time metric
    */
   async recordExecutionTime<T>(
-    metricName: string,
     operation: () => Promise<T> | T,
-    attributes?: Attributes,
+    attributes?: Attributes & { operation_name: string },
   ): Promise<T> {
     const startTime = Date.now();
 
@@ -146,10 +174,10 @@ export class MetricsService {
       const duration = Date.now() - startTime;
 
       this.recordHistogram(
-        metricName,
+        TELEMETRY_CONSTANTS.METRICS.EXECUTION_TIME,
         duration,
         { ...attributes, status: 'success' },
-        { description: `Execution time for ${metricName}`, unit: 'ms' },
+        { description: 'Execution time for operations', unit: 'ms' },
       );
 
       return result;
@@ -157,10 +185,10 @@ export class MetricsService {
       const duration = Date.now() - startTime;
 
       this.recordHistogram(
-        metricName,
+        TELEMETRY_CONSTANTS.METRICS.EXECUTION_TIME,
         duration,
         { ...attributes, status: 'error' },
-        { description: `Execution time for ${metricName}`, unit: 'ms' },
+        { description: 'Execution time for operations', unit: 'ms' },
       );
 
       throw error;
@@ -268,5 +296,45 @@ export class MetricsService {
         { description: 'Total queue operation errors', unit: 'errors' },
       );
     }
+  }
+
+  /**
+   * Validates that the metric name is predefined to prevent high cardinality
+   */
+  private validateMetricName(name: string): asserts name is ValidMetricName {
+    const validNames = Object.values(TELEMETRY_CONSTANTS.METRICS);
+    if (!validNames.includes(name as ValidMetricName)) {
+      const errorMessage = `Invalid metric name: ${name}. Only predefined metrics are allowed to prevent high cardinality. Valid names: ${validNames.join(', ')}`;
+      this.logger.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+  }
+
+  /**
+   * Get all registered metric names (for debugging)
+   */
+  getRegisteredMetrics(): {
+    counters: string[];
+    histograms: string[];
+    upDownCounters: string[];
+    gauges: string[];
+  } {
+    return {
+      counters: [...this.counters.keys()],
+      histograms: [...this.histograms.keys()],
+      upDownCounters: [...this.upDownCounters.keys()],
+      gauges: [...this.gauges.keys()],
+    };
+  }
+
+  /**
+   * Clear all cached metrics (useful for testing)
+   */
+  clearMetrics(): void {
+    this.counters.clear();
+    this.histograms.clear();
+    this.upDownCounters.clear();
+    this.gauges.clear();
+    this.logger.debug('All cached metrics cleared');
   }
 }
