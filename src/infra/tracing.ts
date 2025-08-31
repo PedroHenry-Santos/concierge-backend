@@ -1,3 +1,4 @@
+import { diag, DiagConsoleLogger, DiagLogLevel } from '@opentelemetry/api';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
 import {
@@ -28,6 +29,10 @@ const isProduction = process.env.NODE_ENV === 'production';
 let sdk: NodeSDK | undefined;
 
 export function initOpenTelemetry(): void {
+  if (process.env.NODE_ENV === 'development') {
+    diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
+  }
+
   if (process.env.NODE_ENV === 'test' || sdk) {
     return;
   }
@@ -93,7 +98,9 @@ export function initOpenTelemetry(): void {
           if (
             request &&
             typeof request === 'object' &&
-            'commandInput' in request
+            'commandInput' in request &&
+            request.commandInput &&
+            typeof request.commandInput === 'object'
           ) {
             const commandInput = request.commandInput as Record<
               string,
@@ -109,36 +116,41 @@ export function initOpenTelemetry(): void {
           }
         },
         sqsProcessHook: (span, message) => {
-          if (message && typeof message === 'object') {
-            const messageData = message as unknown as Record<string, unknown>;
-            span.setAttribute(
-              'sqs.message.id',
-              (messageData.MessageId as string) ?? '',
-            );
-            span.setAttribute(
-              'sqs.receipt.handle',
-              (messageData.ReceiptHandle as string) ?? '',
-            );
+          if (!message || typeof message !== 'object') {
+            return;
+          }
 
-            const messageAttributes =
-              (messageData.MessageAttributes as Record<string, unknown>) ?? {};
-            const webhookType = messageAttributes.webhook_type as
-              | { StringValue?: string }
-              | undefined;
-            if (webhookType?.StringValue) {
-              span.setAttribute(
-                'whatsapp.webhook.type',
-                webhookType.StringValue ?? '',
-              );
-            }
+          const messageData = message as unknown as Record<string, unknown>;
+          span.setAttribute(
+            'sqs.message.id',
+            (messageData.MessageId as string) ?? '',
+          );
+          span.setAttribute(
+            'sqs.receipt.handle',
+            (messageData.ReceiptHandle as string) ?? '',
+          );
+
+          const messageAttributes =
+            (messageData.MessageAttributes as Record<string, unknown>) ?? {};
+          const webhookType = messageAttributes.webhook_type as
+            | { StringValue?: string }
+            | undefined;
+          if (webhookType?.StringValue) {
+            span.setAttribute(
+              'whatsapp.webhook.type',
+              webhookType.StringValue ?? '',
+            );
           }
         },
         sqsExtractContextPropagationFromPayload: true,
       }),
       new PinoInstrumentation({
         logHook: (_span, record) => {
-          const recordObject = record as Record<string, unknown>;
-          recordObject['trace.correlation'] = true;
+          const spanContext = _span.spanContext();
+          if (spanContext) {
+            record['trace_id'] = spanContext.traceId;
+            record['span_id'] = spanContext.spanId;
+          }
         },
       }),
     ],
