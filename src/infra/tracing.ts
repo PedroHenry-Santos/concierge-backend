@@ -129,80 +129,12 @@ export function initOpenTelemetry(options?: OpenTelemetryOptions): void {
         },
         '@opentelemetry/instrumentation-nestjs-core': { enabled: true },
         '@opentelemetry/instrumentation-pg': {
-          enabled: true,
-          enhancedDatabaseReporting: !isProduction,
-          requireParentSpan: false,
-          requestHook: (span) => {
-            if (!isProduction) {
-              span.setAttribute('db.slonik', true);
-            }
-          },
-          responseHook: (span, response) => {
-            if (
-              response &&
-              !isProduction &&
-              typeof response === 'object' &&
-              'rowCount' in response
-            ) {
-              span.setAttribute(
-                'db.row_count',
-                (response.rowCount as number) ?? 0,
-              );
-            }
-          },
+          enabled: false,
         },
         '@opentelemetry/instrumentation-aws-sdk': {
           enabled: true,
           suppressInternalInstrumentation: true,
-          preRequestHook: (span, request) => {
-            if (
-              request &&
-              typeof request === 'object' &&
-              'commandInput' in request &&
-              request.commandInput &&
-              typeof request.commandInput === 'object'
-            ) {
-              const commandInput = request.commandInput as Record<
-                string,
-                unknown
-              >;
-              const constructorName = (
-                commandInput?.constructor as { name?: string }
-              )?.name;
-              if (constructorName?.includes('SQS')) {
-                span.setAttribute('messaging.system', 'aws_sqs');
-                span.setAttribute('messaging.whatsapp_backend', true);
-              }
-            }
-          },
-          sqsProcessHook: (span, message) => {
-            if (!message || typeof message !== 'object') {
-              return;
-            }
-
-            const messageData = message as unknown as Record<string, unknown>;
-            span.setAttribute(
-              'sqs.message.id',
-              (messageData.MessageId as string) ?? '',
-            );
-            span.setAttribute(
-              'sqs.receipt.handle',
-              (messageData.ReceiptHandle as string) ?? '',
-            );
-
-            const messageAttributes =
-              (messageData.MessageAttributes as Record<string, unknown>) ?? {};
-            const webhookType = messageAttributes.webhook_type as
-              | { StringValue?: string }
-              | undefined;
-            if (webhookType?.StringValue) {
-              span.setAttribute(
-                'whatsapp.webhook.type',
-                webhookType.StringValue ?? '',
-              );
-            }
-          },
-          sqsExtractContextPropagationFromPayload: true,
+          sqsExtractContextPropagationFromPayload: false,
         },
         '@opentelemetry/instrumentation-pino': {
           enabled: true,
