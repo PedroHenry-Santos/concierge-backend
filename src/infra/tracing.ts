@@ -16,6 +16,12 @@ import { resourceFromAttributes } from '@opentelemetry/resources';
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import {
+  BatchSpanProcessor,
+  ConsoleSpanExporter,
+  ParentBasedSampler,
+  TraceIdRatioBasedSampler,
+} from '@opentelemetry/sdk-trace-base';
+import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,
 } from '@opentelemetry/semantic-conventions';
@@ -38,11 +44,14 @@ export function initOpenTelemetry(): void {
   }
 
   const otlpTraceExporter = new OTLPTraceExporter({
-    url: process.env.OTLP_TRACE_ENDPOINT ?? 'http://localhost:4317',
+    url:
+      process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ?? 'http://localhost:4317',
   });
+  const debugExporter = new ConsoleSpanExporter();
 
   const otlpMetricExporter = new OTLPMetricExporter({
-    url: process.env.OTLP_METRIC_ENDPOINT ?? 'http://localhost:4317',
+    url:
+      process.env.OTEL_EXPORTER_OTLP_METRIC_ENDPOINT ?? 'http://localhost:4317',
   });
 
   const metricReader = new PeriodicExportingMetricReader({
@@ -51,7 +60,18 @@ export function initOpenTelemetry(): void {
   });
 
   sdk = new NodeSDK({
-    traceExporter: otlpTraceExporter,
+    sampler: new ParentBasedSampler({
+      root: new TraceIdRatioBasedSampler(isProduction ? 0.1 : 1),
+    }),
+    spanProcessor: new BatchSpanProcessor(otlpTraceExporter, {
+      maxExportBatchSize: isProduction ? 200 : 50,
+      exportTimeoutMillis: isProduction ? 5000 : 2000,
+      scheduledDelayMillis: isProduction ? 2000 : 1000,
+    }),
+    traceExporter:
+      process.env.NODE_ENV === 'development'
+        ? debugExporter
+        : otlpTraceExporter,
     metricReader: metricReader,
     contextManager: new AsyncLocalStorageContextManager(),
     textMapPropagator: new CompositePropagator({
@@ -62,11 +82,18 @@ export function initOpenTelemetry(): void {
     }),
     instrumentations: [
       getNodeAutoInstrumentations({
-        '@opentelemetry/instrumentation-dns': {
-          enabled: false,
-        },
-        '@opentelemetry/instrumentation-net': {
-          enabled: false,
+        '@opentelemetry/instrumentation-fs': { enabled: false },
+        '@opentelemetry/instrumentation-dns': { enabled: false },
+        '@opentelemetry/instrumentation-net': { enabled: false },
+        '@opentelemetry/instrumentation-http': {
+          enabled: true,
+          ignoreIncomingRequestHook: (request) => {
+            return (
+              request.url?.includes('/health') ??
+              request.url?.includes('/metrics') ??
+              false
+            );
+          },
         },
       }),
       new NestInstrumentation(),
