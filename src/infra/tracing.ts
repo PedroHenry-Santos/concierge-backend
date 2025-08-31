@@ -63,11 +63,13 @@ export function initOpenTelemetry(): void {
     sampler: new ParentBasedSampler({
       root: new TraceIdRatioBasedSampler(isProduction ? 0.1 : 1),
     }),
-    spanProcessor: new BatchSpanProcessor(otlpTraceExporter, {
-      maxExportBatchSize: isProduction ? 200 : 50,
-      exportTimeoutMillis: isProduction ? 5000 : 2000,
-      scheduledDelayMillis: isProduction ? 2000 : 1000,
-    }),
+    spanProcessors: [
+      new BatchSpanProcessor(otlpTraceExporter, {
+        maxExportBatchSize: isProduction ? 200 : 50,
+        exportTimeoutMillis: isProduction ? 5000 : 2000,
+        scheduledDelayMillis: isProduction ? 2000 : 1000,
+      }),
+    ],
     traceExporter:
       process.env.NODE_ENV === 'development'
         ? debugExporter

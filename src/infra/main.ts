@@ -1,5 +1,5 @@
-import { getSdk, initOpenTelemetry } from './tracing';
-initOpenTelemetry();
+// Import instrument.ts FIRST to ensure proper OpenTelemetry initialization order
+import './instrument';
 
 import { NestFactory } from '@nestjs/core';
 import {
@@ -11,6 +11,8 @@ import { AppModule } from '@/infra/app.module';
 import { registerGracefulShutdown } from '@/infra/utils';
 import { ConfigurationService } from '@/sharedModules/configuration/services';
 import { LoggerService } from '@/sharedModules/logger/services/logger.service';
+
+import { getSdk } from './tracing';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(
