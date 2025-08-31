@@ -24,11 +24,11 @@ export class TelemetryConfigService implements TelemetryOptionsFactory {
 
       otlp: {
         traceEndpoint: this.configService.get<string>(
-          'OTLP_TRACE_ENDPOINT',
+          'OTEL_EXPORTER_OTLP_TRACES_ENDPOINT',
           'http://localhost:4317',
         ),
         metricEndpoint: this.configService.get<string>(
-          'OTLP_METRIC_ENDPOINT',
+          'OTEL_EXPORTER_OTLP_METRIC_ENDPOINT',
           'http://localhost:4317',
         ),
         enabled: this.configService.get<boolean>('OTLP_ENABLED', true),

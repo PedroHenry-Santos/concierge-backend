@@ -45,7 +45,7 @@ TelemetryModule.forRoot({})
 // user-service/src/app.module.ts
 TelemetryModule.forRoot({ serviceName: 'user-service' })
 
-// order-service/src/app.module.ts  
+// order-service/src/app.module.ts
 TelemetryModule.forRoot({ serviceName: 'order-service' })
 
 // notification-service/src/app.module.ts
@@ -91,13 +91,13 @@ As dependências já estão incluídas no `package.json`:
 ```env
 # Configuração de Serviço (Nova funcionalidade - dinâmica!)
 OTEL_SERVICE_NAME=whatsapp-backend          # Nome do serviço (pode ser personalizado)
-SERVICE_NAME=minha-aplicacao                 # Alternativa para nome personalizado  
+SERVICE_NAME=minha-aplicacao                 # Alternativa para nome personalizado
 SERVICE_VERSION=1.2.0                       # Versão personalizada da aplicação
 NODE_ENV=production                          # Ambiente (development/staging/production)
 
 # OTLP gRPC Exporters (Único exporter - mais limpo e performático)
-OTLP_TRACE_ENDPOINT=http://localhost:4317   # Endpoint para traces
-OTLP_METRIC_ENDPOINT=http://localhost:4317  # Endpoint para métricas
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:4317   # Endpoint para traces
+OTEL_EXPORTER_OTLP_METRIC_ENDPOINT=http://localhost:4317  # Endpoint para métricas
 OTLP_ENABLED=true                            # Habilitar/desabilitar OTLP
 
 # Sampling (Performance)
@@ -106,7 +106,7 @@ OTEL_SAMPLING_TYPE=parentBased               # always/never/ratio/parentBased
 
 # Configuração para Microserviços (Exemplos)
 # OTEL_SERVICE_NAME=user-service             # Para serviço de usuários
-# OTEL_SERVICE_NAME=order-service            # Para serviço de pedidos  
+# OTEL_SERVICE_NAME=order-service            # Para serviço de pedidos
 # OTEL_SERVICE_NAME=notification-service     # Para serviço de notificações
 ```
 
@@ -117,12 +117,12 @@ OTEL_SAMPLING_TYPE=parentBased               # always/never/ratio/parentBased
 export OTEL_SERVICE_NAME=whatsapp-dev
 export SERVICE_VERSION=dev-branch-name
 
-# Staging  
+# Staging
 export OTEL_SERVICE_NAME=whatsapp-staging
 export SERVICE_VERSION=1.2.0-rc1
 
 # Produção
-export OTEL_SERVICE_NAME=whatsapp-backend  
+export OTEL_SERVICE_NAME=whatsapp-backend
 export SERVICE_VERSION=1.2.0
 ```
 
@@ -160,7 +160,7 @@ import { TelemetryModule } from '@/sharedModules/telemetry/telemetry.module';
       },
       inject: [ConfigurationService],
     }),
-    
+
     // OU configuração factory customizada
     TelemetryModule.forRootAsync({
       useFactory: () => ({
@@ -211,7 +211,7 @@ export class UserService {
     });
 
     const user = await this.userRepository.save(userData);
-    
+
     // Adicionar evento ao span
     this.telemetry.addSpanEvent('user.created', {
       'user.id': user.id,
@@ -274,7 +274,7 @@ export class PaymentService {
 
         try {
           const result = await this.paymentProvider.charge(paymentData);
-          
+
           this.telemetry.addSpanEvent('payment.charged', {
             'payment.transaction_id': result.transactionId,
           });
@@ -306,17 +306,17 @@ export class OrderService {
     this.metrics.incrementCounter(
       'orders_created_total',
       1,
-      { 
+      {
         order_type: orderData.type,
-        customer_tier: orderData.customerTier 
+        customer_tier: orderData.customerTier
       }
     );
 
     const startTime = Date.now();
-    
+
     try {
       const order = await this.orderRepository.save(orderData);
-      
+
       // Registrar tempo de processamento
       this.metrics.recordHistogram(
         'order_creation_duration_ms',
@@ -331,7 +331,7 @@ export class OrderService {
         Date.now() - startTime,
         { status: 'error' }
       );
-      
+
       this.metrics.incrementCounter('orders_creation_errors_total');
       throw error;
     }
@@ -366,7 +366,7 @@ export class UserRepository {
 
   async findUserById(id: string): Promise<User | null> {
     const sql = sql`SELECT * FROM users WHERE id = ${id}`;
-    
+
     return this.postgres.instrumentSlonikQuery(
       sql.sql,
       sql.values,
@@ -382,11 +382,11 @@ export class UserRepository {
     return this.postgres.instrumentTransaction(
       async () => {
         const insertSql = sql`
-          INSERT INTO users (name, email, created_at) 
+          INSERT INTO users (name, email, created_at)
           VALUES (${userData.name}, ${userData.email}, NOW())
           RETURNING *
         `;
-        
+
         const result = await this.pool.query(insertSql);
         return result.rows[0];
       },
@@ -410,7 +410,7 @@ export class NotificationService {
 
   async sendNotification(notification: NotificationDto): Promise<void> {
     const queueUrl = 'https://sqs.us-east-1.amazonaws.com/123456789/notifications';
-    
+
     await this.sqsInstrumentation.instrumentSendMessage(
       queueUrl,
       JSON.stringify(notification),
@@ -422,7 +422,7 @@ export class NotificationService {
             type: { StringValue: notification.type, DataType: 'String' },
           },
         });
-        
+
         return this.sqsClient.send(command);
       },
       {
@@ -434,7 +434,7 @@ export class NotificationService {
 
   async processMessages(): Promise<void> {
     const queueUrl = 'https://sqs.us-east-1.amazonaws.com/123456789/notifications';
-    
+
     const messages = await this.sqsInstrumentation.instrumentReceiveMessage(
       queueUrl,
       async () => {
@@ -443,7 +443,7 @@ export class NotificationService {
           MaxNumberOfMessages: 10,
           WaitTimeSeconds: 20,
         });
-        
+
         const result = await this.sqsClient.send(command);
         return result.Messages || [];
       }
@@ -457,7 +457,7 @@ export class NotificationService {
           // Processar mensagem
           const notification = JSON.parse(message.Body!);
           await this.handleNotification(notification);
-          
+
           // Deletar mensagem após processamento
           await this.sqsInstrumentation.instrumentDeleteMessage(
             message.MessageId!,
@@ -467,7 +467,7 @@ export class NotificationService {
                 QueueUrl: queueUrl,
                 ReceiptHandle: message.ReceiptHandle!,
               });
-              
+
               return this.sqsClient.send(deleteCommand);
             }
           );
@@ -489,7 +489,7 @@ export class WhatsAppWebhookService {
 
   async handleIncomingMessage(webhookData: WhatsAppWebhookDto): Promise<void> {
     const success = await this.processWebhook(webhookData);
-    
+
     // Registrar métrica específica do WhatsApp
     this.metrics.recordWhatsAppMetric(
       'message_received',
@@ -504,19 +504,19 @@ export class WhatsAppWebhookService {
   async sendMessage(messageData: SendMessageDto): Promise<boolean> {
     try {
       await this.whatsappClient.sendMessage(messageData);
-      
+
       this.metrics.recordWhatsAppMetric('message_sent', true, {
         recipient: messageData.to,
         message_type: messageData.type,
       });
-      
+
       return true;
     } catch (error) {
       this.metrics.recordWhatsAppMetric('message_sent', false, {
         recipient: messageData.to,
         error_type: error.constructor.name,
       });
-      
+
       throw error;
     }
   }
@@ -550,8 +550,8 @@ export class SystemMetricsService implements OnModuleInit {
       'database_active_connections',
       async () => {
         const result = await this.pool.query(sql`
-          SELECT count(*) as active_connections 
-          FROM pg_stat_activity 
+          SELECT count(*) as active_connections
+          FROM pg_stat_activity
           WHERE state = 'active'
         `);
         return parseInt(result.rows[0].active_connections);
@@ -582,7 +582,7 @@ export class SystemMetricsService implements OnModuleInit {
 
 ### OTLP gRPC (Único exporter - Arquitetura limpa)
 - **Traces**: Endpoint gRPC em `http://localhost:4317`
-- **Métricas**: Endpoint gRPC em `http://localhost:4317`  
+- **Métricas**: Endpoint gRPC em `http://localhost:4317`
 - **Compatível com**: Jaeger, Grafana, DataDog, New Relic, Honeycomb
 - **Formato padrão**: OpenTelemetry Protocol (OTLP)
 - **Performance**: ~40% mais eficiente que HTTP/JSON
@@ -593,7 +593,7 @@ export class SystemMetricsService implements OnModuleInit {
 - `whatsapp_operations_total` - Total de operações WhatsApp
 - `whatsapp_operations_errors_total` - Erros em operações WhatsApp
 - `database_operation_duration` - Duração de operações do banco
-- `database_operations_total` - Total de operações do banco  
+- `database_operations_total` - Total de operações do banco
 - `queue_operations_total` - Total de operações de fila
 - `queue_operations_errors_total` - Erros em operações de fila
 - `http_requests_total` - Total de requisições HTTP (auto-instrumentação)
@@ -603,7 +603,7 @@ export class SystemMetricsService implements OnModuleInit {
 
 ### Traces/Métricas não aparecem no Collector OTLP
 - Verifique se `OTLP_ENABLED=true`
-- Confirme endpoints: `OTLP_TRACE_ENDPOINT` e `OTLP_METRIC_ENDPOINT`  
+- Confirme endpoints: `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` e `OTEL_EXPORTER_OTLP_METRIC_ENDPOINT`
 - Verifique se o collector está rodando em `localhost:4317`
 - Teste conectividade: `telnet localhost 4317`
 - Verifique sampling ratio: `OTEL_SAMPLING_RATIO=1`
@@ -617,7 +617,7 @@ docker-compose -f docker-compose.dev.yml up -d
 
 # Acessar interfaces:
 # - Jaeger UI: http://localhost:16686 (traces)
-# - Grafana: http://localhost:3000 (admin/admin)  
+# - Grafana: http://localhost:3000 (admin/admin)
 # - Prometheus: http://localhost:9090 (métricas)
 ```
 
@@ -661,14 +661,14 @@ services:
     ports:
       - "4317:4317"    # OTLP gRPC
       - "4318:4318"    # OTLP HTTP
-  
+
   prometheus:
     image: prom/prometheus:latest
     ports:
       - "9090:9090"
-  
+
   grafana:
-    image: grafana/grafana:latest  
+    image: grafana/grafana:latest
     ports:
       - "3000:3000"
 ```
@@ -714,7 +714,7 @@ TelemetryModule.forRoot({
 // App 1: Chat API
 TelemetryModule.forRoot({ serviceName: 'chat-api' })
 
-// App 2: Webhook Processor  
+// App 2: Webhook Processor
 TelemetryModule.forRoot({ serviceName: 'webhook-processor' })
 ```
 
@@ -723,15 +723,15 @@ TelemetryModule.forRoot({ serviceName: 'webhook-processor' })
 Se nenhuma configuração for fornecida, o módulo usa valores padrão:
 
 - **serviceName**: `'whatsapp-backend'` (valor atual)
-- **serviceVersion**: `'1.0.0'` (valor atual)  
+- **serviceVersion**: `'1.0.0'` (valor atual)
 - **Todos os instrumentos**: Mantêm funcionalidade idêntica
 
 ### Testes de Regressão
 
-✅ Compilação TypeScript: **Passou**  
-✅ Linting ESLint: **Passou**  
-✅ Código existente: **Funciona sem mudanças**  
-✅ Novas funcionalidades: **Testadas e funcionando**  
+✅ Compilação TypeScript: **Passou**
+✅ Linting ESLint: **Passou**
+✅ Código existente: **Funciona sem mudanças**
+✅ Novas funcionalidades: **Testadas e funcionando**
 
 ## Contribuição
 

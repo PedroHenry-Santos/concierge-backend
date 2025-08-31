@@ -12,9 +12,12 @@ import { resourceFromAttributes } from '@opentelemetry/resources';
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import {
+  AlwaysOffSampler,
+  AlwaysOnSampler,
   BatchSpanProcessor,
   ConsoleSpanExporter,
   ParentBasedSampler,
+  Sampler,
   TraceIdRatioBasedSampler,
 } from '@opentelemetry/sdk-trace-base';
 import {
@@ -31,11 +34,40 @@ const isProduction = process.env.NODE_ENV === 'production';
 let sdk: NodeSDK | undefined;
 
 export interface OpenTelemetryOptions {
-    serviceName?: string;
-    serviceVersion?: string;
+  serviceName?: string;
+  serviceVersion?: string;
 }
 
-export function initOpenTelemetry(options: OpenTelemetryOptions): void {
+function createSampler(): Sampler {
+  const samplingType = process.env.OTEL_SAMPLING_TYPE ?? 'parentBased';
+  const samplingRatio = Number(
+    process.env.OTEL_SAMPLING_RATIO ?? (isProduction ? '0.1' : '1'),
+  );
+
+  switch (samplingType) {
+    case 'always': {
+      return new AlwaysOnSampler();
+    }
+    case 'never': {
+      return new AlwaysOffSampler();
+    }
+    case 'ratio': {
+      return new TraceIdRatioBasedSampler(samplingRatio);
+    }
+    case 'parentBased': {
+      return new ParentBasedSampler({
+        root: new TraceIdRatioBasedSampler(samplingRatio),
+      });
+    }
+    default: {
+      return new ParentBasedSampler({
+        root: new TraceIdRatioBasedSampler(samplingRatio),
+      });
+    }
+  }
+}
+
+export function initOpenTelemetry(options?: OpenTelemetryOptions): void {
   if (process.env.NODE_ENV === 'development') {
     diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
   }
@@ -61,9 +93,7 @@ export function initOpenTelemetry(options: OpenTelemetryOptions): void {
   });
 
   sdk = new NodeSDK({
-    sampler: new ParentBasedSampler({
-      root: new TraceIdRatioBasedSampler(isProduction ? 0.1 : 1),
-    }),
+    sampler: createSampler(),
     spanProcessors: [
       new BatchSpanProcessor(otlpTraceExporter, {
         maxExportBatchSize: isProduction ? 200 : 50,
@@ -92,9 +122,8 @@ export function initOpenTelemetry(options: OpenTelemetryOptions): void {
           enabled: true,
           ignoreIncomingRequestHook: (request) => {
             return (
-              request.url?.includes('/health') ??
-              request.url?.includes('/metrics') ??
-              false
+              (request.url?.includes('/health') ?? false) ||
+              (request.url?.includes('/metrics') ?? false)
             );
           },
         },
@@ -188,8 +217,10 @@ export function initOpenTelemetry(options: OpenTelemetryOptions): void {
       }),
     ],
     resource: resourceFromAttributes({
-      [ATTR_SERVICE_NAME]: options?.serviceVersion ?? process.env.OTEL_SERVICE_NAME,
-      [ATTR_SERVICE_VERSION]: options?.serviceName ?? process.env.npm_package_version,
+      [ATTR_SERVICE_NAME]:
+        options?.serviceName ?? process.env.OTEL_SERVICE_NAME,
+      [ATTR_SERVICE_VERSION]:
+        options?.serviceVersion ?? process.env.npm_package_version,
       [ATTR_SERVICE_NAMESPACE]: 'concierge',
       [ATTR_DEPLOYMENT_ENVIRONMENT]: process.env.NODE_ENV ?? 'development',
     }),
