@@ -1,3 +1,6 @@
+import { getSdk, initOpenTelemetry } from './tracing';
+initOpenTelemetry();
+
 import { NestFactory } from '@nestjs/core';
 import {
   FastifyAdapter,
@@ -24,7 +27,23 @@ async function bootstrap(): Promise<void> {
 
   registerGracefulShutdown(app, {
     timeoutMs: 15_000,
-    cleanupTasks: [],
+    cleanupTasks: [
+      async () => {
+        const sdk = getSdk();
+        if (sdk) {
+          try {
+            await sdk.shutdown();
+            logger.log('OpenTelemetry SDK shutdown successfully', 'Shutdown');
+          } catch (error: unknown) {
+            logger.error(
+              'Error shutting down OpenTelemetry SDK',
+              (error as Error).message,
+              'Shutdown',
+            );
+          }
+        }
+      },
+    ],
   });
 
   const port = configuration.get('port');
