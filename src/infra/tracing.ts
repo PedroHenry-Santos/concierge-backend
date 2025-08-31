@@ -6,9 +6,11 @@ import {
   W3CBaggagePropagator,
   W3CTraceContextPropagator,
 } from '@opentelemetry/core';
+import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-grpc';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-grpc';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
 import { resourceFromAttributes } from '@opentelemetry/resources';
+import { BatchLogRecordProcessor } from '@opentelemetry/sdk-logs';
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import {
@@ -98,6 +100,19 @@ export function initOpenTelemetry(options?: OpenTelemetryOptions): void {
     exportIntervalMillis: 60_000,
   });
 
+  const otlpLogExporter = new OTLPLogExporter({
+    url:
+      process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT ?? 'http://localhost:4317',
+  });
+
+  const resource = resourceFromAttributes({
+    [ATTR_SERVICE_NAME]: options?.serviceName ?? process.env.OTEL_SERVICE_NAME,
+    [ATTR_SERVICE_VERSION]:
+      options?.serviceVersion ?? process.env.npm_package_version,
+    [ATTR_SERVICE_NAMESPACE]: 'concierge',
+    [ATTR_DEPLOYMENT_ENVIRONMENT]: process.env.NODE_ENV ?? 'development',
+  });
+
   sdk = new NodeSDK({
     sampler: createSampler(),
     spanProcessors: [
@@ -111,6 +126,11 @@ export function initOpenTelemetry(options?: OpenTelemetryOptions): void {
         : []),
     ],
     metricReader: metricReader,
+    logRecordProcessor: new BatchLogRecordProcessor(otlpLogExporter, {
+      maxExportBatchSize: isProduction ? 200 : 50,
+      exportTimeoutMillis: isProduction ? 5000 : 2000,
+      scheduledDelayMillis: isProduction ? 2000 : 1000,
+    }),
     contextManager: new AsyncLocalStorageContextManager(),
     textMapPropagator: new CompositePropagator({
       propagators: [
@@ -123,6 +143,10 @@ export function initOpenTelemetry(options?: OpenTelemetryOptions): void {
         '@opentelemetry/instrumentation-fs': { enabled: false },
         '@opentelemetry/instrumentation-dns': { enabled: false },
         '@opentelemetry/instrumentation-net': { enabled: false },
+        '@opentelemetry/instrumentation-runtime-node': {
+          enabled: true,
+          monitoringPrecision: 5000,
+        },
         '@opentelemetry/instrumentation-http': {
           enabled: true,
           ignoreIncomingRequestHook: (request) => {
@@ -155,14 +179,7 @@ export function initOpenTelemetry(options?: OpenTelemetryOptions): void {
         },
       }),
     ],
-    resource: resourceFromAttributes({
-      [ATTR_SERVICE_NAME]:
-        options?.serviceName ?? process.env.OTEL_SERVICE_NAME,
-      [ATTR_SERVICE_VERSION]:
-        options?.serviceVersion ?? process.env.npm_package_version,
-      [ATTR_SERVICE_NAMESPACE]: 'concierge',
-      [ATTR_DEPLOYMENT_ENVIRONMENT]: process.env.NODE_ENV ?? 'development',
-    }),
+    resource,
   });
 
   sdk.start();
