@@ -1,12 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { metrics } from '@opentelemetry/api';
+import { Meter } from '@opentelemetry/api';
 
+import { TELEMETRY_CONSTANTS } from '../constants/telemetry.constants';
 import { Attributes } from '../types/telemetry.types';
+import { TelemetryService } from './telemetry.service';
 
 @Injectable()
 export class MetricsService {
   private readonly logger = new Logger(MetricsService.name);
-  private readonly meter = metrics.getMeter('whatsapp-backend-custom-metrics');
+  private readonly meter: Meter;
+
+  constructor(private readonly telemetryService: TelemetryService) {
+    this.meter = this.telemetryService.getMeter();
+  }
 
   private readonly counters = new Map<
     string,
@@ -175,14 +181,19 @@ export class MetricsService {
       ...attributes,
     };
 
-    this.incrementCounter('whatsapp_operations_total', 1, baseAttributes, {
-      description: 'Total WhatsApp operations',
-      unit: 'operations',
-    });
+    this.incrementCounter(
+      TELEMETRY_CONSTANTS.METRICS.WHATSAPP_OPERATIONS_TOTAL,
+      1,
+      baseAttributes,
+      {
+        description: 'Total WhatsApp operations',
+        unit: 'operations',
+      },
+    );
 
     if (!success) {
       this.incrementCounter(
-        'whatsapp_operations_errors_total',
+        TELEMETRY_CONSTANTS.METRICS.WHATSAPP_OPERATION_ERRORS,
         1,
         baseAttributes,
         { description: 'Total WhatsApp operation errors', unit: 'errors' },
@@ -206,16 +217,21 @@ export class MetricsService {
     };
 
     this.recordHistogram(
-      'database_operation_duration',
+      TELEMETRY_CONSTANTS.METRICS.DATABASE_OPERATION_DURATION,
       duration,
       baseAttributes,
       { description: 'Database operation duration', unit: 'ms' },
     );
 
-    this.incrementCounter('database_operations_total', 1, baseAttributes, {
-      description: 'Total database operations',
-      unit: 'operations',
-    });
+    this.incrementCounter(
+      TELEMETRY_CONSTANTS.METRICS.DATABASE_OPERATIONS_TOTAL,
+      1,
+      baseAttributes,
+      {
+        description: 'Total database operations',
+        unit: 'operations',
+      },
+    );
   }
 
   /**
@@ -234,14 +250,19 @@ export class MetricsService {
       ...attributes,
     };
 
-    this.incrementCounter('queue_operations_total', 1, baseAttributes, {
-      description: 'Total queue operations',
-      unit: 'operations',
-    });
+    this.incrementCounter(
+      TELEMETRY_CONSTANTS.METRICS.QUEUE_OPERATIONS_TOTAL,
+      1,
+      baseAttributes,
+      {
+        description: 'Total queue operations',
+        unit: 'operations',
+      },
+    );
 
     if (!success) {
       this.incrementCounter(
-        'queue_operations_errors_total',
+        TELEMETRY_CONSTANTS.METRICS.QUEUE_OPERATION_ERRORS,
         1,
         baseAttributes,
         { description: 'Total queue operation errors', unit: 'errors' },

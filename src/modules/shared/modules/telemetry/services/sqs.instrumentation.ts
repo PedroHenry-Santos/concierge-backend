@@ -1,12 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { trace } from '@opentelemetry/api';
 
 import { TelemetryService } from './telemetry.service';
 
 @Injectable()
 export class SQSInstrumentationService {
   private readonly logger = new Logger(SQSInstrumentationService.name);
-  private readonly tracer = trace.getTracer('aws-sqs-instrumentation');
 
   constructor(private readonly telemetryService: TelemetryService) {}
 

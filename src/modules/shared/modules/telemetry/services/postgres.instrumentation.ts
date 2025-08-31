@@ -1,12 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { trace } from '@opentelemetry/api';
 
 import { TelemetryService } from './telemetry.service';
 
 @Injectable()
 export class PostgresInstrumentationService {
   private readonly logger = new Logger(PostgresInstrumentationService.name);
-  private readonly tracer = trace.getTracer('postgres-slonik-instrumentation');
 
   constructor(private readonly telemetryService: TelemetryService) {}
 

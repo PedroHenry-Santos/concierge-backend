@@ -13,6 +13,63 @@ Um módulo completo de telemetria usando OpenTelemetry para NestJS 11, fornecend
 - ✅ **Interceptors Automáticos**: Tracing e métricas transparentes
 - ✅ **Propagação Moderna**: Apenas W3C (sem overhead legacy)
 - ✅ **Graceful Shutdown**: Finalização limpa de recursos
+- ✅ **Configuração Dinâmica**: Service name e version configuráveis por aplicação
+
+## Configuração de Service Name
+
+### Service Name Dinâmico (Nova Funcionalidade!)
+
+O módulo agora permite configurar o nome do serviço dinamicamente, tornando-o reutilizável em diferentes aplicações:
+
+```typescript
+// Opção 1: Nome personalizado estático
+TelemetryModule.forRoot({
+  serviceName: 'minha-api',
+  serviceVersion: '1.2.0'
+})
+// → Tracer/Meter: 'minha-api@1.2.0'
+
+// Opção 2: Via variáveis de ambiente (atual)
+// OTEL_SERVICE_NAME=user-service npm start
+// → Tracer/Meter: 'user-service@1.0.0'
+
+// Opção 3: Padrão (compatibilidade)
+TelemetryModule.forRoot({})
+// → Tracer/Meter: 'whatsapp-backend@1.0.0'
+```
+
+### Casos de Uso
+
+**Microserviços com nomes únicos:**
+```typescript
+// user-service/src/app.module.ts
+TelemetryModule.forRoot({ serviceName: 'user-service' })
+
+// order-service/src/app.module.ts  
+TelemetryModule.forRoot({ serviceName: 'order-service' })
+
+// notification-service/src/app.module.ts
+TelemetryModule.forRoot({ serviceName: 'notification-service' })
+```
+
+**Ambientes diferentes:**
+```typescript
+TelemetryModule.forRootAsync({
+  useFactory: () => ({
+    serviceName: `whatsapp-${process.env.NODE_ENV}`, // whatsapp-dev, whatsapp-prod
+    serviceVersion: process.env.APP_VERSION || '1.0.0'
+  })
+})
+```
+
+**Reutilização do módulo:**
+```typescript
+// Aplicação A
+TelemetryModule.forRoot({ serviceName: 'chat-api' })
+
+// Aplicação B (mesmo módulo de telemetria)
+TelemetryModule.forRoot({ serviceName: 'webhook-processor' })
+```
 
 ## Instalação
 
@@ -32,33 +89,97 @@ As dependências já estão incluídas no `package.json`:
 ### 1. Variáveis de Ambiente
 
 ```env
-# Serviço
-OTEL_SERVICE_NAME=whatsapp-backend
-NODE_ENV=production
+# Configuração de Serviço (Nova funcionalidade - dinâmica!)
+OTEL_SERVICE_NAME=whatsapp-backend          # Nome do serviço (pode ser personalizado)
+SERVICE_NAME=minha-aplicacao                 # Alternativa para nome personalizado  
+SERVICE_VERSION=1.2.0                       # Versão personalizada da aplicação
+NODE_ENV=production                          # Ambiente (development/staging/production)
 
 # OTLP gRPC Exporters (Único exporter - mais limpo e performático)
-OTLP_TRACE_ENDPOINT=http://localhost:4317
-OTLP_METRIC_ENDPOINT=http://localhost:4317
-OTLP_ENABLED=true
+OTLP_TRACE_ENDPOINT=http://localhost:4317   # Endpoint para traces
+OTLP_METRIC_ENDPOINT=http://localhost:4317  # Endpoint para métricas
+OTLP_ENABLED=true                            # Habilitar/desabilitar OTLP
 
-# Sampling
-OTEL_SAMPLING_RATIO=1.0
-OTEL_SAMPLING_TYPE=parentBased
+# Sampling (Performance)
+OTEL_SAMPLING_RATIO=1.0                      # 1.0 = 100%, 0.1 = 10% (produção)
+OTEL_SAMPLING_TYPE=parentBased               # always/never/ratio/parentBased
+
+# Configuração para Microserviços (Exemplos)
+# OTEL_SERVICE_NAME=user-service             # Para serviço de usuários
+# OTEL_SERVICE_NAME=order-service            # Para serviço de pedidos  
+# OTEL_SERVICE_NAME=notification-service     # Para serviço de notificações
+```
+
+### Personalização por Ambiente
+
+```bash
+# Desenvolvimento
+export OTEL_SERVICE_NAME=whatsapp-dev
+export SERVICE_VERSION=dev-branch-name
+
+# Staging  
+export OTEL_SERVICE_NAME=whatsapp-staging
+export SERVICE_VERSION=1.2.0-rc1
+
+# Produção
+export OTEL_SERVICE_NAME=whatsapp-backend  
+export SERVICE_VERSION=1.2.0
 ```
 
 ### 2. Integração no App Module
 
-O módulo já está integrado em `src/infra/app.module.ts`:
+O módulo suporta configuração **dinâmica** através de diferentes formas:
 
+#### Configuração Estática (Simples)
 ```typescript
 import { TelemetryModule } from '@/sharedModules/telemetry/telemetry.module';
 
 @Module({
   imports: [
-    // ... outros módulos
-    TelemetryModule.forRootAsync({
-      inject: [ConfigurationModule],
+    TelemetryModule.forRoot({
+      serviceName: 'minha-aplicacao',        // Nome personalizado
+      serviceVersion: '2.0.0',               // Versão personalizada
+      environment: 'production',
     }),
+  ],
+})
+export class AppModule {}
+```
+
+#### Configuração Dinâmica (Recomendada)
+```typescript
+import { TelemetryModule } from '@/sharedModules/telemetry/telemetry.module';
+
+@Module({
+  imports: [
+    // Configuração atual - usa variáveis de ambiente
+    TelemetryModule.forRootAsync({
+      useFactory: (configService: ConfigurationService) => {
+        const telemetryConfig = new TelemetryConfigService(configService);
+        return telemetryConfig.createTelemetryOptions();
+      },
+      inject: [ConfigurationService],
+    }),
+    
+    // OU configuração factory customizada
+    TelemetryModule.forRootAsync({
+      useFactory: () => ({
+        serviceName: process.env.SERVICE_NAME || 'whatsapp-backend',
+        serviceVersion: process.env.SERVICE_VERSION || '1.0.0',
+        environment: process.env.NODE_ENV || 'development',
+      }),
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+#### Configuração Padrão (Backward Compatible)
+```typescript
+@Module({
+  imports: [
+    // Se nenhuma configuração for fornecida, usa 'whatsapp-backend' como padrão
+    TelemetryModule.forRoot({}),
   ],
 })
 export class AppModule {}
@@ -551,6 +672,66 @@ services:
     ports:
       - "3000:3000"
 ```
+
+## Retrocompatibilidade e Migração
+
+### ✅ Compatibilidade Garantida
+
+A nova funcionalidade de **service name dinâmico** mantém 100% de compatibilidade com código existente:
+
+```typescript
+// ANTES (funciona igual)
+TelemetryModule.forRootAsync({
+  useFactory: (configService: ConfigurationService) => {
+    return telemetryConfig.createTelemetryOptions();
+  },
+  inject: [ConfigurationService],
+})
+
+// DEPOIS (mesma funcionalidade + opções dinâmicas)
+// Código existente continua funcionando sem mudanças
+```
+
+### Migração Gradual
+
+**Passo 1: Código atual (sem mudanças necessárias)**
+```typescript
+// Continua funcionando - usa 'whatsapp-backend' como padrão
+TelemetryModule.forRootAsync({ /* configuração atual */ })
+```
+
+**Passo 2: Adicionar service name personalizado (opcional)**
+```typescript
+// Adicione serviceName quando quiser personalizar
+TelemetryModule.forRoot({
+  serviceName: 'meu-novo-nome',  // ← Só isso muda
+  // demais opções iguais
+})
+```
+
+**Passo 3: Usar em diferentes aplicações (reutilização)**
+```typescript
+// App 1: Chat API
+TelemetryModule.forRoot({ serviceName: 'chat-api' })
+
+// App 2: Webhook Processor  
+TelemetryModule.forRoot({ serviceName: 'webhook-processor' })
+```
+
+### Valores Padrão (Fallback)
+
+Se nenhuma configuração for fornecida, o módulo usa valores padrão:
+
+- **serviceName**: `'whatsapp-backend'` (valor atual)
+- **serviceVersion**: `'1.0.0'` (valor atual)  
+- **Todos os instrumentos**: Mantêm funcionalidade idêntica
+
+### Testes de Regressão
+
+✅ Compilação TypeScript: **Passou**  
+✅ Linting ESLint: **Passou**  
+✅ Código existente: **Funciona sem mudanças**  
+✅ Novas funcionalidades: **Testadas e funcionando**  
 
 ## Contribuição
 

@@ -1,22 +1,75 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import {
   context,
+  Meter,
   metrics,
   SpanKind,
   SpanStatusCode,
   trace,
+  Tracer,
 } from '@opentelemetry/api';
 
+import { TELEMETRY_CONSTANTS } from '../constants/telemetry.constants';
+import { TelemetryModuleOptions } from '../types/telemetry.interface';
 import {
   Attributes,
   SpanKind as CustomSpanKind,
+  TELEMETRY_MODULE_OPTIONS,
 } from '../types/telemetry.types';
 
 @Injectable()
 export class TelemetryService {
   private readonly logger = new Logger(TelemetryService.name);
-  private readonly tracer = trace.getTracer('whatsapp-backend');
-  private readonly meter = metrics.getMeter('whatsapp-backend');
+  private readonly tracer: Tracer;
+  private readonly meter: Meter;
+  private readonly instrumentationName: string;
+  private readonly instrumentationVersion: string;
+
+  constructor(
+    @Optional()
+    @Inject(TELEMETRY_MODULE_OPTIONS)
+    private readonly options?: TelemetryModuleOptions,
+  ) {
+    // Use dynamic service name or fallback to default
+    this.instrumentationName =
+      this.options?.serviceName ?? TELEMETRY_CONSTANTS.INSTRUMENTATION_NAME;
+
+    // Use dynamic service version or fallback to default
+    this.instrumentationVersion =
+      this.options?.serviceVersion ??
+      TELEMETRY_CONSTANTS.INSTRUMENTATION_VERSION;
+
+    // Create tracer and meter with dynamic or default names
+    this.tracer = trace.getTracer(
+      this.instrumentationName,
+      this.instrumentationVersion,
+    );
+
+    this.meter = metrics.getMeter(
+      this.instrumentationName,
+      this.instrumentationVersion,
+    );
+
+    this.logger.debug(
+      `Telemetry initialized with service: ${this.instrumentationName}@${this.instrumentationVersion}`,
+    );
+  }
+
+  /**
+   * Get the centralized tracer instance
+   * Use this instead of creating new tracers in other services
+   */
+  getTracer(): Tracer {
+    return this.tracer;
+  }
+
+  /**
+   * Get the centralized meter instance
+   * Use this instead of creating new meters in other services
+   */
+  getMeter(): Meter {
+    return this.meter;
+  }
 
   /**
    * Start a new span with optional attributes
